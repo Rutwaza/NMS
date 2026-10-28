@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Command Post</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<style>
+:root{--bg:#090d0a;--pn:#0f1711;--ln:#1f3a2a;--tx:#c9e8d0;--dim:#6f8f7a;--ac:#3dff8a;--wn:#ffb020;--cr:#ff3b3b}
+body.red{--bg:#0f0505;--pn:#170909;--ln:#4a1a1a;--tx:#ffb0a0;--dim:#a05a50;--ac:#ff5a4a}
+body.red .leaflet-tile-pane{filter:sepia(1) hue-rotate(-50deg) saturate(3) brightness(.65)}
+*{box-sizing:border-box}body{margin:0;height:100vh;display:flex;flex-direction:column;background:var(--bg);color:var(--tx);font:12px/1.4 ui-monospace,Consolas,monospace}
+body:after{content:"";position:fixed;inset:0;pointer-events:none;background:repeating-linear-gradient(transparent 0 2px,rgba(0,0,0,.14) 2px 3px)}
+header{height:48px;display:flex;align-items:center;gap:14px;padding:0 12px;border-bottom:1px solid var(--ln);background:var(--pn)}
+.brand b{color:var(--ac);letter-spacing:3px;font-size:15px}.brand span{display:block;color:var(--dim);font-size:10px;letter-spacing:2px}
+#cnt span{margin-right:10px}#clk{color:var(--dim);margin-left:auto;text-align:right}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--cr)}.dot.ok{background:var(--ac);box-shadow:0 0 8px var(--ac)}
+.tb{display:flex;gap:4px;flex-wrap:wrap}.b{background:none;border:1px solid var(--ln);color:var(--tx);padding:4px 8px;font:inherit;cursor:pointer}.b:hover,.b.on{border-color:var(--ac);color:var(--ac)}
+#app{flex:1;min-height:0;display:grid;grid-template-columns:290px 1fr 270px}
+aside{background:var(--pn);overflow:auto;border-right:1px solid var(--ln)}#log{border-left:1px solid var(--ln);border-right:0}
+h3{margin:0;padding:8px 10px;font-size:11px;letter-spacing:2px;color:var(--dim);border-bottom:1px solid var(--ln)}
+.u{padding:9px 10px;border-bottom:1px solid var(--ln);cursor:pointer;border-left:3px solid var(--c)}.u:hover,.u.f{background:#ffffff0c}
+.u .r{display:flex;justify-content:space-between;align-items:center}.u b{font-size:14px}
+.bd{padding:1px 6px;border:1px solid;font-size:10px}.ACTIVE{color:var(--ac)}.HALT{color:#4db8ff}.STALE,.NOFIX{color:var(--wn)}.LOST{color:var(--cr)}.SOS{color:#fff;background:var(--cr);animation:bl .6s infinite alternate}.WAIT{color:var(--dim)}
+@keyframes bl{to{opacity:.35}}.g{display:grid;grid-template-columns:1fr 1fr;gap:2px 8px;margin-top:5px;color:var(--dim)}.g i{color:var(--tx);font-style:normal}
+.bar{height:5px;background:#ffffff14;margin-top:5px}.bar div{height:100%;background:var(--ac)}.bar.w div{background:var(--wn)}.bar.c div{background:var(--cr)}
+.sg{display:inline-flex;gap:1px;align-items:flex-end;height:10px}.sg s{width:3px;background:#ffffff2a}.sg s.on{background:var(--ac)}
+#mapw{position:relative}#map{height:100%;background:#000}#cur{position:absolute;left:8px;bottom:22px;z-index:900;background:#000b;padding:3px 7px;border:1px solid var(--ln)}
+#ev{list-style:none;margin:0;padding:0}#ev li{padding:5px 10px;border-bottom:1px solid var(--ln)}#ev .warn{color:var(--wn)}#ev .crit{color:var(--cr);font-weight:bold}#ev small{color:var(--dim)}
+footer{display:none;gap:10px;align-items:center;padding:6px 12px;background:var(--pn);border-top:1px solid var(--ln)}footer.on{display:flex}#sl{flex:1}
+.mk{width:30px;height:30px;position:relative}.mk svg{width:30px;height:30px}.ring{position:absolute;inset:3px;border:2px solid var(--c);border-radius:50%;animation:pl 2s infinite}
+@keyframes pl{from{transform:scale(.6);opacity:.9}to{transform:scale(1.8);opacity:0}}.dead .ring{display:none}.dead svg{filter:grayscale(1) opacity(.55)}.sos .ring{border-color:#f33;animation-duration:.6s}
+.lbl{background:#090d0ae0;border:1px solid var(--ln);color:var(--ac);font:11px ui-monospace,monospace;box-shadow:none;padding:1px 5px}.lbl:before{display:none}.hl .lbl{display:none}
+.leaflet-container{font:inherit}.leaflet-control-layers,.leaflet-bar a{background:var(--pn);color:var(--tx);border-color:var(--ln)}
+@media(max-width:900px){#app{grid-template-columns:220px 1fr}#log{display:none}.brand span{display:none}}
+</style></head><body>
+<header><div class="brand"><b>COMMAND POST</b><span>SYNDICATE TRACKING SYSTEM</span></div><div id="cnt"></div>
+<div class="tb"><button class="b" id="bFit">FIT</button><button class="b" id="bTr">TRAIL 60m</button><button class="b" id="bLb">LABELS</button><button class="b" id="bZn">+ZONE</button><button class="b" id="bMs">MEASURE</button><button class="b" id="bRp">REPLAY</button><button class="b" id="bSn">SOUND</button><button class="b" id="bNt">NIGHT</button><button class="b" id="bFs">FULL</button></div>
+<div id="clk"></div><div id="lnk" class="dot" title="link"></div></header>
+<div id="app"><aside id="units"><h3>UNITS</h3><div id="ul"></div></aside>
+<div id="mapw"><div id="map"></div><div id="cur">--</div></div>
+<aside id="log"><h3>EVENT LOG</h3><ul id="ev"></ul></aside></div>
+<footer id="rp"><button class="b" id="rpb">PLAY</button><input type="range" id="sl" step="1"><span id="rtl">--</span><select id="rate" class="b"><option value="1">x1</option><option value="10" selected>x10</option><option value="60">x60</option><option value="300">x300</option></select></footer>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+<script>
+const C={databaseURL:"https://tracker-6c988-default-rtdb.firebaseio.com",
+ units:{syndicate5:"ALPHA-1"},            // id : callsign (new ids in /devices are auto-discovered)
+ center:[-1.944,30.062],zoom:14,history:400,staleSec:180,lostSec:480,lowBat:20,critBat:10,cartoKey:"cb1_4tfo_1_4f8cba17d38ccab956d1fea8",demo:false};   // cartoKey: optional free key from carto.com/basemaps/apikey
+// demo:true forces the simulated units
+const demo=C.demo||C.databaseURL.includes("YOUR-PROJECT");
+const $=s=>document.querySelector(s),rad=Math.PI/180,COL=["#3dff8a","#4db8ff","#ffb020","#ff6ad5","#b28cff","#ffe14d"];
+const U={},Zs=[];let mode="live",rt=0,playing=false,follow=null,sound=false,trailSec=3600,zoneMode=false,msMode=false,msPts=[],last=performance.now(),ac;
+const map=L.map("map",{zoomControl:true,maxZoom:19}).setView(C.center,C.zoom);
+const T=(u,o)=>L.tileLayer(u,Object.assign({maxZoom:19},o));
+const base={Dark:L.layerGroup([T("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}",{maxNativeZoom:16,attribution:"Esri"}),T("https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}",{maxNativeZoom:16})]),
+ Satellite:T("https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}",{attribution:"Esri"}),
+ Street:T("https://tile.openstreetmap.org/{z}/{x}/{y}.png",{attribution:"&copy; OpenStreetMap"}),
+ Topo:T("https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png",{maxNativeZoom:17,attribution:"&copy; OpenTopoMap"})};
+if(C.cartoKey)base["Dark (CARTO)"]=T("https://{s}.basemaps.cartocdn.com/rastertiles/dark_all/{z}/{x}/{y}.png?key="+C.cartoKey,{subdomains:"abcd",attribution:"&copy; OSM &copy; CARTO"});
+base.Dark.addTo(map);L.control.layers(base).addTo(map);L.control.scale({imperial:false}).addTo(map);
+const msL=L.layerGroup().addTo(map);
+
+function dist(a,b,c,d){const x=(c-a)*rad,y=(d-b)*rad,s=Math.sin(x/2)**2+Math.cos(a*rad)*Math.cos(c*rad)*Math.sin(y/2)**2;return 12742000*Math.asin(Math.sqrt(s))}
+function brg(a,b,c,d){const y=Math.sin((d-b)*rad)*Math.cos(c*rad),x=Math.cos(a*rad)*Math.sin(c*rad)-Math.sin(a*rad)*Math.cos(c*rad)*Math.cos((d-b)*rad);return(Math.atan2(y,x)/rad+360)%360}
+const card=h=>["N","NE","E","SE","S","SW","W","NW"][Math.round(h/45)%8];
+function dms(v,p,n){const s=v<0?n:p;v=Math.abs(v);const d=Math.floor(v),m=Math.floor((v-d)*60);return d+"\u00b0"+String(m).padStart(2,"0")+"'"+(((v-d)*60-m)*60).toFixed(1)+'"'+s}
+const fmtD=m=>m>=1000?(m/1000).toFixed(2)+" km":Math.round(m)+" m";
+const hms=t=>new Date(t*1000).toISOString().slice(11,19)+"Z";
+function posAt(p,t){const n=p.length;if(!n)return null;if(t<=p[0].t)return p[0];if(t>=p[n-1].t)return p[n-1];let lo=0,hi=n-1;while(hi-lo>1){const m=(lo+hi)>>1;p[m].t<=t?lo=m:hi=m}
+ const a=p[lo],b=p[hi],f=(t-a.t)/(b.t-a.t),dh=((b.h-a.h+540)%360)-180;return{t,la:a.la+(b.la-a.la)*f,lo:a.lo+(b.lo-a.lo)*f,s:a.s+(b.s-a.s)*f,h:(a.h+dh*f+360)%360}}
+
+function addUnit(id,call){if(U[id])return U[id];const col=COL[Object.keys(U).length%COL.length];
+ const u=U[id]={id,call:call||id.toUpperCase(),col,live:{},pts:[],ph:null,dist:0,fl:{},zin:{},st:"WAIT",lag:0};
+ u.mk=L.marker(C.center,{zIndexOffset:500,icon:L.divIcon({className:"",iconSize:[30,30],iconAnchor:[15,15],html:'<div class="mk" style="--c:'+col+'"><div class="ring"></div><svg class="ar" viewBox="-12 -12 24 24"><path d="M0-10L7 8 0 4-7 8Z" fill="'+col+'" stroke="#000"/></svg></div>'})}).bindTooltip(u.call,{permanent:true,direction:"right",offset:[14,0],className:"lbl"});
+ u.mk.on("click",()=>focusU(id));u.tr=L.polyline([],{color:col,weight:3,opacity:.75}).addTo(map);u.acc=L.circle(C.center,{radius:10,color:col,weight:1,fillOpacity:.08,opacity:.5}).addTo(map);return u}
+function addPt(u,t,la,lo,s,h){const p=u.pts,n=p.length;if(n&&t===p[n-1].t)return;p.push({t,la,lo,s:s||0,h:h||0});
+ if(n&&p[n-1].t>t){p.sort((a,b)=>a.t-b.t);u.dist=0;for(let i=1;i<p.length;i++)u.dist+=dist(p[i-1].la,p[i-1].lo,p[i].la,p[i].lo)}
+ else if(n)u.dist+=dist(p[n-1].la,p[n-1].lo,la,lo)}
+
+function ev(l,u,m){const li=document.createElement("li");li.className=l;li.innerHTML="<small>"+new Date().toISOString().slice(11,19)+"Z</small> <b>"+(u?u.call:"SYS")+"</b> "+m;
+ $("#ev").prepend(li);while($("#ev").children.length>150)$("#ev").lastChild.remove();if(l!=="info")beep(l)}
+function beep(l){if(!sound)return;ac=ac||new(window.AudioContext||window.webkitAudioContext)();const o=ac.createOscillator(),g=ac.createGain();o.frequency.value=l==="crit"?880:520;g.gain.value=.08;o.connect(g);g.connect(ac.destination);o.start();o.stop(ac.currentTime+(l==="crit"?.5:.2))}
+function flag(u,k,on,l,m,clr){if(on&&!u.fl[k]){u.fl[k]=1;ev(l,u,m)}else if(!on&&u.fl[k]){u.fl[k]=0;if(clr)ev("info",u,clr)}}
+
+function onLive(u,v){if(!v)return;const o=u.live;u.live=v;u.rx=Date.now();
+ if(o.up!==undefined&&v.up<o.up)ev("warn",u,"device RESET (code "+v.rr+")");
+ flag(u,"sos",!!v.sos,"crit","SOS / DISTRESS ACTIVATED","SOS cleared");
+ flag(u,"low",v.bp!==undefined&&v.bp<=C.lowBat&&v.bp>C.critBat,"warn","battery low "+v.bp+"%");
+ flag(u,"crit",v.bp!==undefined&&v.bp<=C.critBat,"crit","battery CRITICAL "+v.bp+"%");
+ flag(u,"nofix",v.fix===0,"warn","GPS fix lost","GPS fix restored")}
+
+function addZone(n,la,lo,r,save){const c=L.circle([la,lo],{radius:r,color:"#ff3b3b",weight:1.5,fillOpacity:.1,dashArray:"6 4"}).addTo(map).bindTooltip(n,{permanent:true,className:"lbl",direction:"center"});
+ Zs.push({n,la,lo,r,c});if(save)localStorage.setItem("zones",JSON.stringify(Zs.map(z=>({n:z.n,la:z.la,lo:z.lo,r:z.r}))))}
+try{JSON.parse(localStorage.getItem("zones")||"[]").forEach(z=>addZone(z.n,z.la,z.lo,z.r))}catch(e){}
+
+function place(u,q,hide){if(!q||hide){if(u.on){map.removeLayer(u.mk);u.on=0}return}
+ if(!u.on){u.mk.addTo(map);u.on=1}u.mk.setLatLng([q.la,q.lo]);u.acc.setLatLng([q.la,q.lo]).setRadius(Math.max(5,(u.live.hd||2)*5));
+ const el=u.mk.getElement();if(el){const a=el.querySelector(".ar");if(a)a.style.transform="rotate("+q.h+"deg)"}}
+const maxT=()=>Math.max(0,...Object.values(U).map(u=>u.pts.length?u.pts[u.pts.length-1].t:0)),minT=()=>Math.min(...Object.values(U).filter(u=>u.pts.length).map(u=>u.pts[0].t),Infinity);
+function frame(){const now=performance.now(),dt=Math.min(1,(now-last)/1000);last=now;
+ if(mode==="replay"&&playing){rt=Math.min(maxT(),rt+dt*(+$("#rate").value));$("#sl").value=rt}
+ for(const u of Object.values(U)){const p=u.pts;if(!p.length)continue;let t,hide=false;
+  if(mode==="live"){const e=p[p.length-1].t;u.ph=u.ph==null?Math.max(p[0].t,e-45):Math.min(e,u.ph+dt*(e-u.ph>120?4:1));t=u.ph;u.lag=e-u.ph}
+  else{t=rt;hide=t<p[0].t}
+  u.cur=posAt(p,t);place(u,u.cur,hide)}
+ if(follow&&U[follow]&&U[follow].cur)map.panTo([U[follow].cur.la,U[follow].cur.lo],{animate:false});
+ requestAnimationFrame(frame)}
+
+function tick(){const n=Date.now()/1000,c={ACTIVE:0,STALE:0,LOST:0,SOS:0};
+ $("#clk").innerHTML=new Date().toISOString().slice(0,19).replace("T"," ")+"Z<br>"+new Date().toLocaleTimeString()+" local";
+ for(const u of Object.values(U)){const v=u.live,age=v.seen?n-v.seen/1e3:(u.rx?n-u.rx/1e3:null);u.age=age;
+  let st="WAIT";if(age!==null){st=age>C.lostSec?"LOST":age>C.staleSec?"STALE":v.sos?"SOS":v.fix===0?"NOFIX":(v.s>1.5?"ACTIVE":"HALT")}
+  u.st=st;flag(u,"stale",st==="STALE","warn","no report for "+Math.round(age)+" s","reporting again");flag(u,"lost",st==="LOST","crit","CONTACT LOST ("+Math.round(age/60)+" min)","contact restored");
+  if(st==="SOS")c.SOS++;else if(st==="LOST")c.LOST++;else if(st==="STALE"||st==="NOFIX")c.STALE++;else if(st!=="WAIT")c.ACTIVE++;
+  const el=u.mk.getElement();if(el){const m=el.querySelector(".mk");if(m){m.classList.toggle("dead",st==="LOST"||st==="STALE");m.classList.toggle("sos",st==="SOS")}}
+  const p=u.pts,e=p[p.length-1],vt=mode==="live"?u.ph:rt,a=[];
+  if(p.length){for(let i=p.length-1;i>=0;i--){if(p[i].t>vt)continue;if(p[i].t<vt-trailSec)break;a.push([p[i].la,p[i].lo])}a.reverse();if(u.cur)a.push([u.cur.la,u.cur.lo])}u.tr.setLatLngs(a);
+  if(e)Zs.forEach(z=>{const inn=dist(e.la,e.lo,z.la,z.lo)<z.r;if(inn!==!!u.zin[z.n]){u.zin[z.n]=inn;ev("warn",u,(inn?"ENTERED":"LEFT")+" zone "+z.n)}})}
+ $("#cnt").innerHTML='<span style="color:var(--ac)">ACTIVE '+c.ACTIVE+'</span><span style="color:var(--wn)">STALE '+c.STALE+'</span><span style="color:var(--cr)">LOST '+c.LOST+" SOS "+c.SOS+"</span>";
+ render();if(mode==="replay"){const s=$("#sl");s.min=minT();s.max=maxT();$("#rtl").textContent=hms(rt)}}
+
+function render(){$("#ul").innerHTML=Object.values(U).map(u=>{const v=u.live,q=u.cur||{},b=v.bp,bc=b<=C.critBat?"c":b<=C.lowBat?"w":"",sq=v.q>=20?4:v.q>=14?3:v.q>=9?2:v.q>=2?1:0;
+ return'<div class="u'+(follow===u.id?" f":"")+'" style="--c:'+u.col+'" onclick="focusU(\''+u.id+'\')" ondblclick="followU(\''+u.id+'\')"><div class="r"><b>'+u.call+'</b><span class="bd '+u.st+'">'+u.st+"</span></div>"+
+ '<div class="g"><span>SPD <i>'+(v.s!==undefined?(+v.s).toFixed(1):"--")+' km/h</i></span><span>HDG <i>'+(q.h!==undefined?card(q.h)+" "+Math.round(q.h)+"\u00b0":"--")+"</i></span>"+
+ "<span>SATS <i>"+(v.sat??"--")+"</i> HDOP <i>"+(v.hd??"--")+"</i></span><span>SIG <span class=\"sg\">"+[1,2,3,4].map(i=>'<s style="height:'+i*2.5+'px" class="'+(i<=sq?"on":"")+'"></s>').join("")+"</span></span>"+
+ "<span>DIST <i>"+fmtD(u.dist)+"</i></span><span>AGE <i>"+(u.age==null?"--":u.age<90?Math.round(u.age)+" s":Math.round(u.age/60)+" min")+"</i></span>"+
+ '<span style="grid-column:1/3">POS <i>'+(q.la!==undefined?q.la.toFixed(5)+", "+q.lo.toFixed(5):"--")+"</i></span>"+
+ '<span style="grid-column:1/3">PACK <i>'+(v.b!==undefined?(+v.b).toFixed(2)+" V":"--")+"</i> &nbsp;DISPLAY LAG <i>"+Math.round(u.lag||0)+" s</i></span></div>"+
+ '<div class="bar '+bc+'"><div style="width:'+(b||0)+'%"></div></div></div>'}).join("")}
+window.focusU=id=>{const u=U[id];if(u&&u.cur)map.setView([u.cur.la,u.cur.lo],Math.max(map.getZoom(),16))};
+window.followU=id=>{follow=follow===id?null:id;if(follow)focusU(id)};
+
+$("#bFit").onclick=()=>{follow=null;const a=Object.values(U).filter(u=>u.cur).map(u=>[u.cur.la,u.cur.lo]);if(a.length)map.fitBounds(a,{padding:[60,60],maxZoom:17})};
+$("#bTr").onclick=e=>{const o=[[300,"5m"],[900,"15m"],[3600,"60m"],[1e9,"ALL"]],i=(o.findIndex(x=>x[0]===trailSec)+1)%4;trailSec=o[i][0];e.target.textContent="TRAIL "+o[i][1]};
+$("#bLb").onclick=e=>{e.target.classList.toggle("on");$("#map").classList.toggle("hl")};
+$("#bZn").onclick=e=>{zoneMode=!zoneMode;e.target.classList.toggle("on",zoneMode)};
+$("#bMs").onclick=e=>{msMode=!msMode;msPts=[];msL.clearLayers();e.target.classList.toggle("on",msMode)};
+$("#bSn").onclick=e=>{sound=!sound;e.target.classList.toggle("on",sound);if(sound)beep("warn")};
+$("#bNt").onclick=e=>{document.body.classList.toggle("red");e.target.classList.toggle("on")};
+$("#bFs").onclick=()=>document.fullscreenElement?document.exitFullscreen():document.documentElement.requestFullscreen();
+$("#bRp").onclick=e=>{mode=mode==="live"?"replay":"live";e.target.classList.toggle("on",mode==="replay");$("#rp").classList.toggle("on",mode==="replay");map.invalidateSize();
+ if(mode==="replay"){rt=Math.max(minT(),maxT()-600);playing=false;$("#rpb").textContent="PLAY"}else Object.values(U).forEach(u=>u.ph=null)};
+$("#rpb").onclick=e=>{playing=!playing;e.target.textContent=playing?"PAUSE":"PLAY"};$("#sl").oninput=e=>{rt=+e.target.value};
+map.on("mousemove",e=>$("#cur").textContent=e.latlng.lat.toFixed(5)+", "+e.latlng.lng.toFixed(5)+"  "+dms(e.latlng.lat,"N","S")+" "+dms(e.latlng.lng,"E","W"));
+map.on("click",e=>{if(zoneMode){const n=prompt("Zone name");const r=n&&+prompt("Radius (m)","300");if(n&&r>0)addZone(n,e.latlng.lat,e.latlng.lng,r,true);zoneMode=false;$("#bZn").classList.remove("on")}
+ else if(msMode){if(msPts.length>=2){msPts=[];msL.clearLayers()}msPts.push(e.latlng);L.circleMarker(e.latlng,{radius:4,color:"#fff"}).addTo(msL);
+  if(msPts.length===2){const[a,b]=msPts;L.polyline(msPts,{color:"#fff",dashArray:"4 4",weight:2}).addTo(msL).bindTooltip(fmtD(dist(a.lat,a.lng,b.lat,b.lng))+" / "+Math.round(brg(a.lat,a.lng,b.lat,b.lng))+"\u00b0",{permanent:true,className:"lbl"}).openTooltip()}}});
+
+function setLink(ok){$("#lnk").classList.toggle("ok",ok);ev(ok?"info":"warn",null,ok?"database link UP":"database link DOWN")}
+function startFirebase(){firebase.initializeApp({databaseURL:C.databaseURL});const db=firebase.database();db.ref(".info/connected").on("value",s=>setLink(!!s.val()));
+ const add=(id,call)=>{if(U[id])return;const u=addUnit(id,call);db.ref("devices/"+id+"/live").on("value",s=>onLive(u,s.val()));
+  db.ref("devices/"+id+"/track").orderByKey().limitToLast(C.history).on("child_added",s=>{const v=s.val();if(v)addPt(u,+s.key,v.la,v.lo,v.s,v.h)})};
+ Object.entries(C.units).forEach(([i,c])=>add(i,c));
+ fetch(C.databaseURL+"/devices.json?shallow=true").then(r=>r.json()).then(o=>Object.keys(o||{}).forEach(i=>add(i))).catch(()=>{})}
+
+function startDemo(){$("#lnk").classList.add("ok");ev("info",null,"DEMO MODE - simulated units (set databaseURL in C to go live)");const t0=Date.now();
+ ["ALPHA-1","BRAVO-2","CHARLIE-3","DELTA-4"].forEach((c,i)=>{const u=addUnit("demo"+i,c);u.sim={la:C.center[0]+(i-1.5)*.003,lo:C.center[1]+(i%2?.004:-.004),h:Math.random()*360,s:4+i*.7,b:8.3-i*.4,t:Math.floor(Date.now()/1e3)-300,up:0}});
+ const step=(u,dt)=>{const s=u.sim;s.h=(s.h+(Math.random()-.5)*40+360)%360;const d=s.s/3.6*dt;s.la+=Math.cos(s.h*rad)*d/111320;s.lo+=Math.sin(s.h*rad)*d/(111320*Math.cos(s.la*rad));s.t+=dt;s.b-=.00015*dt;addPt(u,s.t,s.la,s.lo,s.s,s.h)};
+ Object.values(U).forEach(u=>{for(let k=0;k<60;k++)step(u,5)});
+ const send=()=>{const el=(Date.now()-t0)/1e3;Object.values(U).forEach((u,i)=>{if(i===3&&el>70)return;for(let k=0;k<4;k++)step(u,5);const s=u.sim;s.up+=20;
+  onLive(u,{t:s.t,la:s.la,lo:s.lo,s:s.s,h:s.h,hd:1.1+Math.random(),sat:8+i,fix:1,b:s.b,bp:Math.max(0,Math.min(100,Math.round((s.b/2-3.3)/.9*100))),q:18-i*3,up:s.up,rr:1,seen:Date.now(),sos:i===1&&el>40?1:0})})};
+ send();setInterval(send,20000)}
+
+demo?startDemo():startFirebase();setInterval(tick,1000);tick();requestAnimationFrame(frame);setTimeout(()=>$("#bFit").click(),1500);
+</script></body></html>
